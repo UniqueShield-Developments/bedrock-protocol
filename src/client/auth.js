@@ -19,7 +19,7 @@ function validateOptions(options) {
 async function realmAuthenticate(options) {
   validateOptions(options)
 
-  const api = RealmAPI.from(options.token, 'bedrock')
+  const api = RealmAPI.from(options.tokens.realms, 'bedrock')
 
   const getRealms = async () => {
     const realms = await api.getRealms()
@@ -65,7 +65,7 @@ async function authenticate(client, options) {
     const headers = {
       'Content-Type': 'application/json',
       'User-Agent': 'MCPE/UWP',
-      Authorization: `XBL3.0 x=${options.token.userHash};${options.token.XSTSToken}`
+      Authorization: `XBL3.0 x=${options.tokens.bedrock.userHash};${options.tokens.bedrock.XSTSToken}`
     }
 
     const response = await fetch("https://multiplayer.minecraft.net/authentication", {

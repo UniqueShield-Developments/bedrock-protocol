@@ -49,8 +49,11 @@ declare module 'bedrock-protocol' {
     // Called when microsoft authorization is needed when not provided it will the information log to the console instead
     onMsaCode?: (data: ServerDeviceCodeResponse) => void
   }
-
   export interface Tokens {
+    realms: Token,
+    bedrock: Token
+  }
+  export interface Token {
     userHash: string,
     XSTSToken: string
   }

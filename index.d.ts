@@ -29,7 +29,7 @@ declare module 'bedrock-protocol' {
 
   export interface ClientOptions extends Options {
     // The username to connect to the server as
-    username: string
+    token: Tokens
     // The view distance in chunks
     viewDistance?: number
     // Specifies which game edition to sign in as. Optional, but some servers verify this.
@@ -48,6 +48,11 @@ declare module 'bedrock-protocol' {
     profilesFolder?: string | false
     // Called when microsoft authorization is needed when not provided it will the information log to the console instead
     onMsaCode?: (data: ServerDeviceCodeResponse) => void
+  }
+
+  export interface Tokens {
+    userHash: string,
+    XSTSToken: string
   }
 
   export interface ServerOptions extends Options {

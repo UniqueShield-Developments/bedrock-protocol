@@ -5,7 +5,7 @@ const debug = require('debug')('minecraft-protocol')
 const { uuidFrom } = require('../datatypes/util')
 const { RealmAPI } = require('prismarine-realms')
 
-function validateOptions (options) {
+function validateOptions(options) {
   if (!options.profilesFolder) {
     options.profilesFolder = path.join(minecraftFolderPath, 'nmp-cache')
   }
@@ -16,12 +16,10 @@ function validateOptions (options) {
   }
 }
 
-async function realmAuthenticate (options) {
+async function realmAuthenticate(options) {
   validateOptions(options)
 
-  options.authflow = new PrismarineAuth(options.username, options.profilesFolder, options, options.onMsaCode)
-
-  const api = RealmAPI.from(options.authflow, 'bedrock')
+  const api = RealmAPI.from(options.token, 'bedrock')
 
   const getRealms = async () => {
     const realms = await api.getRealms()
@@ -61,14 +59,31 @@ async function realmAuthenticate (options) {
  * @param {object} client - The client passed to protocol
  * @param {object} options - Client Options
  */
-async function authenticate (client, options) {
+async function authenticate(client, options) {
   validateOptions(options)
   try {
-    const authflow = options.authflow || new PrismarineAuth(options.username, options.profilesFolder, options, options.onMsaCode)
-    const chains = await authflow.getMinecraftBedrockToken(client.clientX509).catch(e => {
-      if (options.password) console.warn('Sign in failed, try removing the password field')
-      throw e
+    const headers = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'MCPE/UWP',
+      Authorization: `XBL3.0 x=${options.token.userHash};${options.token.XSTSToken}`
+    }
+
+    const response = await fetch("https://multiplayer.minecraft.net/authentication", {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ identityPublicKey: client.clientX509 })
     })
+
+    const token = await response.json()
+
+    const body = JSON.parse(Buffer.from(token.chain[1].split('.')[1], 'base64').toString())
+
+    if (!body.extraData?.titleId) {
+      return
+    }
+
+
+    const chains = token.chain
 
     debug('chains', chains)
 
@@ -95,7 +110,7 @@ async function authenticate (client, options) {
 /**
  * Creates an offline session for the client
  */
-function createOfflineSession (client, options) {
+function createOfflineSession(client, options) {
   if (!options.username) throw Error('Must specify a valid username')
   const profile = {
     name: options.username,
@@ -105,12 +120,14 @@ function createOfflineSession (client, options) {
   return postAuthenticate(client, profile, []) // No extra JWTs, only send 1 client signed chain with all the data
 }
 
-function postAuthenticate (client, profile, chains) {
+function postAuthenticate(client, profile, chains) {
   client.profile = profile
   client.username = profile.name
   client.accessToken = chains
   client.emit('session', profile)
 }
+
+
 
 module.exports = {
   createOfflineSession,

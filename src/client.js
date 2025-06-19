@@ -16,7 +16,7 @@ class Client extends Connection {
   connection
 
   /** @param {{ version: number, host: string, port: number }} options */
-  constructor (options) {
+  constructor(options) {
     super()
     this.options = { ...Options.defaultOptions, ...options }
 
@@ -39,7 +39,7 @@ class Client extends Connection {
     }
   }
 
-  init () {
+  init() {
     this.validateOptions()
     this.serializer = createSerializer(this.options.version)
     this.deserializer = createDeserializer(this.options.version)
@@ -57,19 +57,20 @@ class Client extends Connection {
     this.emit('connect_allowed')
   }
 
-  _loadFeatures () {
+  _loadFeatures() {
     try {
       const mcData = require('minecraft-data')('bedrock_' + this.options.version)
       this.features = {
         compressorInHeader: mcData.supportFeature('compressorInPacketHeader'),
-        itemRegistryPacket: mcData.supportFeature('itemRegistryPacket')
+        itemRegistryPacket: mcData.supportFeature('itemRegistryPacket'),
+        newLoginIdentityFields: mcData.supportFeature('newLoginIdentityFields')
       }
     } catch (e) {
       throw new Error(`Unsupported version: '${this.options.version}', no data available`)
     }
   }
 
-  connect () {
+  connect() {
     if (!this.connection) throw new Error('Connect not currently allowed') // must wait for `connect_allowed`, or use `createClient`
     this.on('session', this._connect)
 
@@ -83,12 +84,12 @@ class Client extends Connection {
     this.startQueue()
   }
 
-  validateOptions () {
+  validateOptions() {
     if (!this.options.host || this.options.port == null) throw Error('Invalid host/port')
     Options.validateOptions(this.options)
   }
 
-  get entityId () {
+  get entityId() {
     return this.startGameData.runtime_entity_id
   }
 
@@ -97,7 +98,7 @@ class Client extends Connection {
     process.nextTick(() => this.handle(buffer))
   }
 
-  async ping () {
+  async ping() {
     try {
       return await this.connection.ping(this.options.connectTimeout)
     } catch (e) {
@@ -131,13 +132,13 @@ class Client extends Connection {
     }, this.options.connectTimeout || 9000)
   }
 
-  updateCompressorSettings (packet) {
+  updateCompressorSettings(packet) {
     this.compressionAlgorithm = packet.compression_algorithm || 'deflate'
     this.compressionThreshold = packet.compression_threshold
     this.compressionReady = true
   }
 
-  sendLogin () {
+  sendLogin() {
     this.status = ClientStatus.Authenticating
     this.createClientChain(null, this.options.offline)
 
@@ -146,9 +147,18 @@ class Client extends Connection {
       ...this.accessToken // Mojang + Xbox JWT from auth
     ]
 
-    const encodedChain = JSON.stringify({ chain })
-
-    debug('Auth chain', chain)
+    let encodedChain
+    if (this.features.newLoginIdentityFields) { // 1.21.90+
+      encodedChain = JSON.stringify({
+        Certificate: JSON.stringify({ chain }),
+        // 0 = normal, 1 = ss, 2 = offline
+        AuthenticationType: this.options.offline ? 2 : 0,
+        Token: ''
+      })
+    } else {
+      encodedChain = JSON.stringify({ chain })
+    }
+    debug('Auth chain', encodedChain)
 
     this.write('login', {
       protocol_version: this.options.protocolVersion,
@@ -160,13 +170,13 @@ class Client extends Connection {
     this.emit('loggingIn')
   }
 
-  onDisconnectRequest (packet) {
+  onDisconnectRequest(packet) {
     this.conLog?.(`Server requested ${packet.hide_disconnect_reason ? 'silent disconnect' : 'disconnect'}: ${packet.message}`)
     this.emit('kick', packet)
     this.close()
   }
 
-  onPlayStatus (statusPacket) {
+  onPlayStatus(statusPacket) {
     if (this.status === ClientStatus.Initializing && this.options.autoInitPlayer === true) {
       if (statusPacket.status === 'player_spawn') {
         this.status = ClientStatus.Initialized
@@ -181,7 +191,7 @@ class Client extends Connection {
     }
   }
 
-  disconnect (reason = 'Client leaving', hide = false) {
+  disconnect(reason = 'Client leaving', hide = false) {
     if (this.status === ClientStatus.Disconnected) return
     this.write('disconnect', {
       hide_disconnect_screen: hide,
@@ -191,7 +201,7 @@ class Client extends Connection {
     this.close(reason)
   }
 
-  close () {
+  close() {
     if (this.status !== ClientStatus.Disconnected) {
       this.emit('close') // Emit close once
       debug('Client closed!')
@@ -205,7 +215,7 @@ class Client extends Connection {
     this.status = ClientStatus.Disconnected
   }
 
-  readPacket (packet) {
+  readPacket(packet) {
     try {
       var des = this.deserializer.parsePacketBuffer(packet) // eslint-disable-line
     } catch (e) {
@@ -242,7 +252,7 @@ class Client extends Connection {
         break
       case 'start_game':
         this.startGameData = pakData.params
-        // fallsthrough
+      // fallsthrough
       case 'item_registry': // 1.21.60+ send itemstates in item_registry packet
         pakData.params.itemstates?.forEach(state => {
           if (state.name === 'minecraft:shield') {

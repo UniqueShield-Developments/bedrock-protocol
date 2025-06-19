@@ -3,7 +3,7 @@ const mcData = require('minecraft-data')
 // Minimum supported version (< will be kicked)
 const MIN_VERSION = '1.16.201'
 // Currently supported verson. Note, clients with newer versions can still connect as long as data is in minecraft-data
-const CURRENT_VERSION = '1.21.80'
+const CURRENT_VERSION = '1.21.90'
 
 const Versions = Object.fromEntries(mcData.versions.bedrock.filter(e => e.releaseType === 'release').map(e => [e.minecraftVersion, e.version]))
 
@@ -35,7 +35,7 @@ const defaultOptions = {
   compressionThreshold: 512
 }
 
-function validateOptions (options) {
+function validateOptions(options) {
   if (!Versions[options.version]) {
     console.warn('Supported versions', Versions)
     throw Error(`Unsupported version ${options.version}`)

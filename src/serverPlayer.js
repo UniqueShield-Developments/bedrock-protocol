@@ -7,7 +7,7 @@ const LoginVerify = require('./handshake/loginVerify')
 const debug = require('debug')('minecraft-protocol')
 
 class Player extends Connection {
-  constructor (server, connection) {
+  constructor(server, connection) {
     super()
     this.server = server
     this.features = server.features
@@ -38,11 +38,11 @@ class Player extends Connection {
     this._sentNetworkSettings = false // 1.19.30+
   }
 
-  getUserData () {
+  getUserData() {
     return this.userData
   }
 
-  sendNetworkSettings () {
+  sendNetworkSettings() {
     this.write('network_settings', {
       compression_threshold: this.server.compressionThreshold,
       compression_algorithm: this.server.compressionAlgorithm,
@@ -54,7 +54,7 @@ class Player extends Connection {
     this.compressionReady = true
   }
 
-  handleClientProtocolVersion (clientVersion) {
+  handleClientProtocolVersion(clientVersion) {
     if (this.server.options.protocolVersion) {
       if (this.server.options.protocolVersion < clientVersion) {
         this.sendDisconnectStatus('failed_spawn') // client too new
@@ -67,7 +67,7 @@ class Player extends Connection {
     return true
   }
 
-  onLogin (packet) {
+  onLogin(packet) {
     const body = packet.data
     this.emit('loggingIn', body)
 
@@ -78,11 +78,20 @@ class Player extends Connection {
 
     // Parse login data
     const tokens = body.params.tokens
-    const authChain = JSON.parse(tokens.identity)
-    const skinChain = tokens.client
+
 
     try {
-      var { key, userData, skinData } = this.decodeLoginJWT(authChain.chain, skinChain) // eslint-disable-line
+      const skinChain = tokens.client
+      const authChain = JSON.parse(tokens.identity)
+      let chain
+      if (authChain.Certificate) { // 1.21.90+
+        chain = JSON.parse(authChain.Certificate).chain
+      } else if (authChain.chain) {
+        chain = authChain.chain
+      } else {
+        throw new Error('Invalid login packet: missing chain or Certificate')
+      }
+      var { key, userData, skinData } = this.decodeLoginJWT(chain, skinChain) // eslint-disable-line
     } catch (e) {
       debug(this.address, e)
       this.disconnect('Server authentication error')
@@ -106,7 +115,7 @@ class Player extends Connection {
    * Disconnects a client before it has joined
    * @param {string} playStatus
    */
-  sendDisconnectStatus (playStatus) {
+  sendDisconnectStatus(playStatus) {
     if (this.status === ClientStatus.Disconnected) return
     this.write('play_status', { status: playStatus })
     this.close('kick')
@@ -115,7 +124,7 @@ class Player extends Connection {
   /**
    * Disconnects a client
    */
-  disconnect (reason = 'Server closed', hide = false) {
+  disconnect(reason = 'Server closed', hide = false) {
     if (this.status === ClientStatus.Disconnected) return
     this.write('disconnect', {
       hide_disconnect_screen: hide,
@@ -128,14 +137,14 @@ class Player extends Connection {
 
   // After sending Server to Client Handshake, this handles the client's
   // Client to Server handshake response. This indicates successful encryption
-  onHandshake () {
+  onHandshake() {
     // https://wiki.vg/Bedrock_Protocol#Play_Status
     this.write('play_status', { status: 'login_success' })
     this.status = ClientStatus.Initializing
     this.emit('join')
   }
 
-  close (reason) {
+  close(reason) {
     if (this.status !== ClientStatus.Disconnected) {
       this.emit('close') // Emit close once
       if (!reason) this.inLog?.('Client closed connection', this.connection?.address)
@@ -148,7 +157,7 @@ class Player extends Connection {
     this.status = ClientStatus.Disconnected
   }
 
-  readPacket (packet) {
+  readPacket(packet) {
     try {
       var des = this.server.deserializer.parsePacketBuffer(packet) // eslint-disable-line
     } catch (e) {

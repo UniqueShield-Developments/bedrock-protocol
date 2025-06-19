@@ -11,11 +11,10 @@ const { join } = require('path')
 const versions = mcData.versions.bedrock.filter(e => e.releaseType === 'release').map(e => e.minecraftVersion)
 
 // Compile the ProtoDef JSON into JS
-function createProtocol (version) {
+function createProtocol(version) {
   const compiler = new ProtoDefCompiler()
   const protocol = mcData('bedrock_' + version).protocol.types
   compiler.addTypes(require('../src/datatypes/compiler-minecraft'))
-  compiler.addTypes(require('prismarine-nbt/zigzag').compiler)
   compiler.addTypesToCompile(protocol)
 
   fs.writeFileSync('./read.js', 'module.exports = ' + compiler.readCompiler.generate().replace('() =>', 'native =>'))
@@ -26,7 +25,7 @@ function createProtocol (version) {
   return compiledProto
 }
 
-function main (ver = 'latest') {
+function main(ver = 'latest') {
   // Put the .js files into the data/ dir, we also use the data dir when dumping packets for tests
   const dir = join(__dirname, '/../data/', ver)
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
@@ -39,7 +38,7 @@ require('minecraft-data/bin/generate_data')
 
 // If no argument, build everything
 if (!process.argv[2]) {
-  convert('latest')
+  convert('bedrock', 'latest')
   for (const version of versions) {
     main(version)
   }
